@@ -39,7 +39,7 @@ jobs:
         run: |
           MERGE_COMMIT_MESSAGE=$(git log -1 --pretty=%B)
           echo "Merge Commit Message: $MERGE_COMMIT_MESSAGE"
-          PR_ID=$(echo "$MERGE_COMMIT_MESSAGE" | grep -oP 'Merge pull request
+          PR_ID=$(echo "$MERGE_COMMIT_MESSAGE" | grep -oP 'Merge pull request #\K\d+')
           if [ -n "$PR_ID" ]; then
             echo "Extracted Pull Request ID: $PR_ID"
           else
