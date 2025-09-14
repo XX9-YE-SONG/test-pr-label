@@ -8,15 +8,44 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  push-test:
+    if: github.ref_name != 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run a one-line script
+        run: echo push to test repo
+
+  push-test-pr:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
     env:
       PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Run a one-line script
-        run: echo Hello, world!
       - name: Run a multi-line script
         run: |
           echo "PR Labels"
           echo "PR_LABELS_JSON=${PR_LABELS_JSON}"
+
+
+  push-prod:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    env:
+      PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run a multi-line script
+        run: |
+          MERGE_COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+          echo "Merge Commit Message: $MERGE_COMMIT_MESSAGE"
+          PR_ID=$(echo "$MERGE_COMMIT_MESSAGE" | grep -oP 'Merge pull request
+          if [ -n "$PR_ID" ]; then
+            echo "Extracted Pull Request ID: $PR_ID"
+          else
+            echo "Error: Could not find a Pull Request ID in the merge commit message."
+            echo "This job will now fail."
+            exit 1 # Fail the step and thus the job
+          fi
+          PR_LABELS=$(gh pr view "$PR_ID" --json labels --jq '.labels[].name' | tr '\n' ',' | sed 's/,$//')
+          echo "PR Labels: $PR_LABELS"
