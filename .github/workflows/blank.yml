@@ -12,19 +12,19 @@ jobs:
     if: github.ref_name != 'main'
     runs-on: ubuntu-latest
     steps:
-      - name: Run a one-line script
-        run: echo push to test repo
+      - name: Run a multi-line script
+        run: |
+          echo "push to test repo
+          echo "tags: ${{ github.sha }}, ${{ github.repository }}"
 
   push-test-pr:
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
-    env:
-      PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
     steps:
       - name: Run a multi-line script
         run: |
-          echo "PR Labels"
-          echo "PR_LABELS_JSON=${PR_LABELS_JSON}"
+          echo "push to test repo
+          echo "tags: ${{ github.sha }}, ${{ github.repository }}, ${{ github.event.pull_request.number }}"
 
 
   push-prod:
@@ -39,29 +39,68 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # --- 1. Get Merge Commit Message and Extract PR ID ---
           MERGE_COMMIT_MESSAGE=$(git log -1 --pretty=%B)
           echo "Merge Commit Message: $MERGE_COMMIT_MESSAGE"
-          PR_ID=$(echo "$MERGE_COMMIT_MESSAGE" | grep -oP 'Merge pull request #\K\d+' || true)
-          if [ -n "$PR_ID" ]; then
-            echo "Extracted Pull Request ID: $PR_ID"
-          else
-            echo "::error::Could not find a Pull Request ID in the merge commit message. This job requires a PR ID to proceed."
-            exit 1 # Fail the step and thus the job
-          fi
-          PR_LABELS=$(gh pr view "$PR_ID" --json labels --jq '.labels[].name' | tr '\n' ',' | sed 's/,$//')
-          if [ -n "$PR_LABELS" ]; then
-            echo "PR Labels: $PR_LABELS"
-          else
-            # Print the error message to the log before exiting
-            echo "::error::No labels found for Pull Request #$PR_ID. This job requires labels to proceed."
-            exit 1 # Fail the step and thus the job
-          fi
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "no-tag")
 
-          if [ "$LATEST_TAG" != "no-tag" ]; then
-            echo "Latest tag on main: $LATEST_TAG"
-            echo "::set-output name=latest_tag::$LATEST_TAG"
-          else
-            echo "::warning::No tags found on the main branch."
-            echo "::set-output name=latest_tag::" # Set to empty if no tag
+          PR_ID=$(echo "$MERGE_COMMIT_MESSAGE" | grep -oP 'Merge pull request #\K\d+' || true)
+          if [ -z "$PR_ID" ]; then
+            echo "::error::Could not find a Pull Request ID in the merge commit message. This job requires a PR ID to proceed."
+            exit 1
           fi
+          echo "Extracted Pull Request ID: $PR_ID"
+
+          # --- 2. Get PR Labels ---
+          PR_LABELS=$(gh pr view "$PR_ID" --json labels --jq '.labels[].name' | tr '\n' ',' | sed 's/,$//' || true)
+          if [ -z "$PR_LABELS" ]; then
+            echo "::error::No labels found for Pull Request #$PR_ID. This job requires labels (major, minor, or patch) to proceed."
+            exit 1
+          fi
+          echo "PR Labels: $PR_LABELS"
+
+          # --- 3. Get Latest Tag ---
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Current latest tag: $LATEST_TAG"
+
+          # --- 4. Determine Version Bump Type ---
+          BUMP_TYPE="patch" # Default to patch if no specific label found (though we'll fail if no labels)
+          if echo "$PR_LABELS" | grep -q "major"; then
+            BUMP_TYPE="major"
+          elif echo "$PR_LABELS" | grep -q "minor"; then
+            BUMP_TYPE="minor"
+          elif echo "$PR_LABELS" | grep -q "patch"; then
+            BUMP_TYPE="patch"
+          else
+            echo "::error::No 'major', 'minor', or 'patch' label found on PR #$PR_ID. Cannot determine version bump type."
+            exit 1
+          fi
+          echo "Determined bump type: $BUMP_TYPE"
+
+          # --- 5. Calculate New Version ---
+          # Remove 'v' prefix for parsing
+          CURRENT_VERSION_NUM=$(echo "$LATEST_TAG" | sed 's/^v//')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION_NUM"
+
+          case "$BUMP_TYPE" in
+            "major")
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            "minor")
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            "patch")
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+          echo "New calculated version: $NEW_VERSION"
+          echo "::set-output name=new_version::$NEW_VERSION"
+
+          # --- 6. Create and Push New Tag ---
+          # Configure Git for tagging
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
