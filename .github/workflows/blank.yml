@@ -104,3 +104,9 @@ jobs:
           # Configure Git for tagging
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag "$NEW_VERSION"
+          echo "Created tag: $NEW_VERSION"
+
+          git push origin "$NEW_VERSION"
+          echo "Pushed tag: $NEW_VERSION to origin"
