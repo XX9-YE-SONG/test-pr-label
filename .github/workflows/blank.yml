@@ -36,6 +36,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Run a multi-line script
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           MERGE_COMMIT_MESSAGE=$(git log -1 --pretty=%B)
           echo "Merge Commit Message: $MERGE_COMMIT_MESSAGE"
