@@ -56,3 +56,12 @@ jobs:
             echo "::error::No labels found for Pull Request #$PR_ID. This job requires labels to proceed."
             exit 1 # Fail the step and thus the job
           fi
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "no-tag")
+
+          if [ "$LATEST_TAG" != "no-tag" ]; then
+            echo "Latest tag on main: $LATEST_TAG"
+            echo "::set-output name=latest_tag::$LATEST_TAG"
+          else
+            echo "::warning::No tags found on the main branch."
+            echo "::set-output name=latest_tag::" # Set to empty if no tag
+          fi
