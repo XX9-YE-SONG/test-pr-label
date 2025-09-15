@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Run a multi-line script
         run: |
-          echo "push to test repo
+          echo "push to test repo"
           echo "tags: ${{ github.sha }}, ${{ github.repository }}"
 
   push-test-pr:
@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Run a multi-line script
         run: |
-          echo "push to test repo
+          echo "push to test repo"
           echo "tags: ${{ github.sha }}, ${{ github.repository }}, ${{ github.event.pull_request.number }}"
 
 
@@ -32,12 +32,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Run a multi-line script
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           # --- 1. Get Merge Commit Message and Extract PR ID ---
           MERGE_COMMIT_MESSAGE=$(git log -1 --pretty=%B)
