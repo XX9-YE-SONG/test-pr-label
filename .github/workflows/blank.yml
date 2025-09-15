@@ -41,7 +41,7 @@ jobs:
         run: |
           MERGE_COMMIT_MESSAGE=$(git log -1 --pretty=%B)
           echo "Merge Commit Message: $MERGE_COMMIT_MESSAGE"
-          PR_ID=$(echo "$MERGE_COMMIT_MESSAGE" | grep -oP 'Merge pull request #\K\d+')
+          PR_ID=$(echo "$MERGE_COMMIT_MESSAGE" | grep -oP 'Merge pull request #\K\d+' || true))
           if [ -n "$PR_ID" ]; then
             echo "Extracted Pull Request ID: $PR_ID"
           else
@@ -51,7 +51,6 @@ jobs:
           PR_LABELS=$(gh pr view "$PR_ID" --json labels --jq '.labels[].name' | tr '\n' ',' | sed 's/,$//')
           if [ -n "$PR_LABELS" ]; then
             echo "PR Labels: $PR_LABELS"
-            echo "::set-output name=pr_labels::$PR_LABELS"
           else
             # Print the error message to the log before exiting
             echo "::error::No labels found for Pull Request #$PR_ID. This job requires labels to proceed."
