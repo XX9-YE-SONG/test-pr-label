@@ -45,9 +45,15 @@ jobs:
           if [ -n "$PR_ID" ]; then
             echo "Extracted Pull Request ID: $PR_ID"
           else
-            echo "Error: Could not find a Pull Request ID in the merge commit message."
-            echo "This job will now fail."
+            echo "::error::Could not find a Pull Request ID in the merge commit message. This job requires a PR ID to proceed."
             exit 1 # Fail the step and thus the job
           fi
           PR_LABELS=$(gh pr view "$PR_ID" --json labels --jq '.labels[].name' | tr '\n' ',' | sed 's/,$//')
-          echo "PR Labels: $PR_LABELS"
+          if [ -n "$PR_LABELS" ]; then
+            echo "PR Labels: $PR_LABELS"
+            echo "::set-output name=pr_labels::$PR_LABELS"
+          else
+            # Print the error message to the log before exiting
+            echo "::error::No labels found for Pull Request #$PR_ID. This job requires labels to proceed."
+            exit 1 # Fail the step and thus the job
+          fi
